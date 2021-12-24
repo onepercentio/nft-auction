@@ -3,6 +3,7 @@ const { expect } = require("chai");
 const { BigNumber } = require("ethers");
 
 const tokenId = 1;
+const nftAmount = 1;
 const minPrice = 100;
 const buyNowPrice = 10000;
 const newBuyNowPrice = 50000;
@@ -65,6 +66,7 @@ describe("ERC20 New Auction Tests", function () {
       .createNewNftAuction(
         erc1155.address,
         tokenId,
+        nftAmount,
         erc20.address,
         minPrice,
         buyNowPrice,
@@ -84,6 +86,7 @@ describe("ERC20 New Auction Tests", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           erc20.address,
           minPrice,
           buyNowPrice,
@@ -102,6 +105,7 @@ describe("ERC20 New Auction Tests", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           erc20.address,
           0,
           buyNowPrice,
@@ -138,6 +142,7 @@ describe("ERC20 New Auction Tests", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           erc20.address,
           0,
           0,
@@ -155,6 +160,7 @@ describe("ERC20 New Auction Tests", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           erc20.address,
           buyNowPrice,
           minPrice,

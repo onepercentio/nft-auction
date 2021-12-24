@@ -5,6 +5,7 @@ const { BigNumber } = require("ethers");
 // Enable and inject BN dependency
 
 const tokenId = 1;
+const nftAmount = 1;
 const minPrice = 100;
 const buyNowPrice = 10000;
 const newMinPrice = 50;
@@ -72,6 +73,7 @@ describe("ERC20 New Bid Tests", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           erc20.address,
           minPrice,
           buyNowPrice,
@@ -295,6 +297,7 @@ describe("ERC20 New Bid Tests", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           erc20.address,
           minPrice,
           buyNowPrice,

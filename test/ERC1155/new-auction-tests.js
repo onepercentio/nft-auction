@@ -3,6 +3,7 @@ const { expect } = require("chai");
 const { BigNumber } = require("ethers");
 
 const tokenId = 1;
+const nftAmount = 1;
 const minPrice = 100;
 const newMinPrice = 50;
 const buyNowPrice = 100000;
@@ -15,7 +16,7 @@ const emptyFeeRecipients = [];
 const emptyFeePercentages = [];
 // Deploy and create a mock erc1155 contract.
 // 1 basic test, NFT sent from one person to another works correctly.
-describe("NFTAuction", function () {
+describe("SemiFungibleNFTAuction", function () {
   let ERC1155;
   let erc1155;
   let NFTAuction;
@@ -55,6 +56,7 @@ describe("NFTAuction", function () {
       .createNewNftAuction(
         erc1155.address,
         tokenId,
+        nftAmount,
         zeroAddress,
         minPrice,
         buyNowPrice,
@@ -80,6 +82,7 @@ describe("NFTAuction", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           zeroAddress,
           minPrice,
           buyNowPrice,
@@ -98,6 +101,7 @@ describe("NFTAuction", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           zeroAddress,
           0,
           0,
@@ -115,6 +119,7 @@ describe("NFTAuction", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           zeroAddress,
           buyNowPrice,
           minPrice,

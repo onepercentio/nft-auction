@@ -5,6 +5,7 @@ const { BigNumber } = require("ethers");
 // Enable and inject BN dependency
 
 const tokenId = 1;
+const nftAmount = 1;
 const minPrice = 100;
 const newMinPrice = 50;
 const buyNowPrice = 100000;
@@ -19,7 +20,7 @@ const emptyFeePercentages = [];
 
 // Deploy and create a mock erc1155 contract.
 
-describe("NFTAuction Bids", function () {
+describe("SemiFungibleNFTAuction Bids", function () {
   let ERC1155;
   let erc1155;
   let NFTAuction;
@@ -51,6 +52,7 @@ describe("NFTAuction Bids", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           zeroAddress,
           minPrice,
           buyNowPrice,
@@ -306,6 +308,7 @@ describe("NFTAuction Bids", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           zeroAddress,
           minPrice,
           buyNowPrice,
@@ -410,6 +413,7 @@ describe("NFTAuction Bids", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           zeroAddress,
           minPrice,
           buyNowPrice,

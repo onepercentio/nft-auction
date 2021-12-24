@@ -5,6 +5,7 @@ const { BigNumber } = require("ethers");
 // Enable and inject BN dependency
 
 const tokenId = 1;
+const nftAmount = 1;
 const buyNowPrice = 10000;
 const auctionBidPeriod = 86400; //seconds
 const bidIncreasePercentage = 10;
@@ -51,6 +52,7 @@ describe("Whitelist sale tests", function () {
       await nftAuction.connect(user1).createSale(
         erc1155.address,
         tokenId,
+        nftAmount,
         zeroAddress,
         buyNowPrice,
         user2.address, //whitelisted buyer
@@ -183,6 +185,7 @@ describe("Whitelist sale tests", function () {
       await nftAuction.connect(user1).createSale(
         erc1155.address,
         tokenId,
+        nftAmount,
         zeroAddress,
         buyNowPrice,
         user2.address, //whitelisted buyer
@@ -244,6 +247,7 @@ describe("Whitelist sale tests", function () {
       await nftAuction.connect(user1).createSale(
         erc1155.address,
         tokenId,
+        nftAmount,
         zeroAddress,
         buyNowPrice,
         user2.address, //whitelisted buyer
@@ -262,6 +266,7 @@ describe("Whitelist sale tests", function () {
       await nftAuction.connect(user1).createSale(
         erc1155.address,
         tokenId,
+        nftAmount,
         zeroAddress,
         buyNowPrice,
         user2.address, //whitelisted buyer
@@ -275,6 +280,7 @@ describe("Whitelist sale tests", function () {
       await nftAuction.connect(user1).createSale(
         erc1155.address,
         tokenId,
+        nftAmount,
         zeroAddress,
         buyNowPrice,
         user2.address, //whitelisted buyer

@@ -4,6 +4,7 @@ const { BigNumber } = require("ethers");
 const { network } = require("hardhat");
 
 const tokenId = 1;
+const nftAmount = 1;
 const minPrice = 10000;
 const newPrice = 15000;
 const buyNowPrice = 100000;
@@ -109,6 +110,7 @@ describe("End to end auction tests", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           zeroAddress,
           minPrice,
           buyNowPrice,
@@ -197,6 +199,7 @@ describe("End to end auction tests", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           zeroAddress,
           minPrice,
           buyNowPrice,
@@ -257,6 +260,7 @@ describe("End to end auction tests", function () {
         .createNewNftAuction(
           erc1155.address,
           tokenId,
+          nftAmount,
           zeroAddress,
           minPrice,
           buyNowPrice,

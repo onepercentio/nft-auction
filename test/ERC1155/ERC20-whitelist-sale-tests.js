@@ -5,6 +5,7 @@ const { BigNumber } = require("ethers");
 // Enable and inject BN dependency
 
 const tokenId = 1;
+const nftAmount = 1;
 const buyNowPrice = 100;
 const newMinPrice = 50;
 const tokenBidAmount = 250;
@@ -61,6 +62,7 @@ describe("ERC20 Whitelist Sale Tests", function () {
       await nftAuction.connect(user1).createSale(
         erc1155.address,
         tokenId,
+        nftAmount,
         erc20.address,
         buyNowPrice,
         user2.address, //whitelisted buyer

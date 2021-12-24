@@ -5,6 +5,7 @@ const { BigNumber } = require("ethers");
 // Enable and inject BN dependency
 
 const tokenId = 1;
+const nftAmount = 1;
 const minPrice = 100;
 const newMinPrice = 50;
 const buyNowPrice = 10000;
@@ -115,6 +116,7 @@ describe("Early bid tests", function () {
     await nftAuction.connect(user1).createSale(
       erc1155.address,
       tokenId,
+      nftAmount,
       zeroAddress,
       buyNowPrice,
       user3.address, //whitelisted buyer
