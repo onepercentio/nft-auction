@@ -1,5 +1,6 @@
 require("@nomiclabs/hardhat-waffle");
 require("hardhat-gas-reporter");
+require("hardhat-watcher");
 require("solidity-coverage");
 require("@nomiclabs/hardhat-etherscan");
 require("hardhat-deploy");
@@ -47,6 +48,17 @@ module.exports = {
   namedAccounts: {
     deployer: 0,
   },
+  watcher: {
+    compile: {
+      tasks: ['compile'],
+      files: ['./contracts'],
+      verbose: true
+    },
+    test: {
+      tasks: ['test'],
+      files: ['./test/*.js',, './test/**/*.js', './contracts']
+    }
+  }
 
   //uncomment this and run: yarn deploy-rinkeby
   // networks: {
