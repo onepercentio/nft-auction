@@ -161,7 +161,7 @@ describe("SemiFungibleNFTAuction", function () {
     let result = await nftAuction.nftContractAuctions(erc1155.address, tokenId);
     expect(result.nftSeller).to.equal(user1.address);
   });
-  it("shoulld allow seller to specify fees", async function () {
+  it("should allow seller to specify fees", async function () {
     await nftAuction
       .connect(user1)
       .createDefaultNftAuction(
@@ -176,7 +176,7 @@ describe("SemiFungibleNFTAuction", function () {
     let result = await nftAuction.nftContractAuctions(erc1155.address, tokenId);
     expect(result.nftSeller).to.equal(user1.address);
   });
-  it("shoulld revert if fees exceed 100%", async function () {
+  it("should revert if fees exceed 100%", async function () {
     feePercentages = [9900, 1200]; // max = 10000
     await expect(
       nftAuction
@@ -192,7 +192,7 @@ describe("SemiFungibleNFTAuction", function () {
         )
     ).to.be.revertedWith("Fee percentages exceed maximum");
   });
-  it("shoulld revert if recipients and percentages do not align", async function () {
+  it("should revert if recipients and percentages do not align", async function () {
     feePercentages = [1000];
     await expect(
       nftAuction

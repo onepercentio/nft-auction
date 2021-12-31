@@ -593,31 +593,31 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
     /*╔══════════════════════════════╗
       ║  TRANSFER NFTS TO CONTRACT   ║
       ╚══════════════════════════════╝*/
-    function _transferNftToAuctionContract(
+    function _transferNftsToAuctionContract(
         address _nftContractAddress,
         uint256 _tokenId
     ) internal {
         address _nftSeller = nftContractAuctions[_nftContractAddress][_tokenId]
             .nftSeller;
-        if (IERC1155(_nftContractAddress).balanceOf(_nftSeller, _tokenId) > 0) {
-        // if (IERC1155(_nftContractAddress).ownerOf(_tokenId) == _nftSeller) {
+        uint256 _amount = nftContractAuctions[_nftContractAddress][_tokenId]
+            .amount;
+        uint256 _currentBalance = IERC1155(_nftContractAddress).balanceOf(address(this), _tokenId);
+        if (IERC1155(_nftContractAddress).balanceOf(_nftSeller, _tokenId) >= _amount) {
             IERC1155(_nftContractAddress).safeTransferFrom(
                 _nftSeller,
                 address(this),
                 _tokenId,
-                1,
+                _amount,
                 new bytes(0)
             );
             require(
-                IERC1155(_nftContractAddress).balanceOf(address(this), _tokenId) > 0,
-                // IERC1155(_nftContractAddress).ownerOf(_tokenId) == address(this),
+                IERC1155(_nftContractAddress).balanceOf(address(this), _tokenId) == _amount + _currentBalance,
                 "nft transfer failed"
             );
         } else {
             require(
-                IERC1155(_nftContractAddress).balanceOf(address(this), _tokenId) > 0,
-                // IERC1155(_nftContractAddress).ownerOf(_tokenId) == address(this),
-                "Seller doesn't own NFT"
+                IERC1155(_nftContractAddress).balanceOf(address(this), _tokenId) >= _amount,
+                "Insufficient sender NFT balance"
             );
         }
     }
@@ -653,12 +653,13 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
     )
         internal
         minPriceDoesNotExceedLimit(_buyNowPrice, _minPrice)
-        // correctFeeRecipientsAndPercentages(
-        //     _feeRecipients.length,
-        //     _feePercentages.length
-        // )
         isFeePercentagesLessThanMaximum(_feePercentages)
     {
+        // @todo solve 'stack too deep error' and rollback to modifier check
+        require(
+            _feeRecipients.length == _feePercentages.length,
+            "Recipients != percentages"
+        );
         Auction storage _auction = nftContractAuctions[_nftContractAddress][_tokenId];
         if (_erc20Token != address(0)) {
            _auction.ERC20Token = _erc20Token;
@@ -810,7 +811,8 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
             nftContractAuctions[_nftContractAddress][_tokenId]
                 .ERC20Token = _erc20Token;
         }
-        nftContractAuctions[_nftContractAddress][_tokenId].amount = _amount;
+        nftContractAuctions[_nftContractAddress][_tokenId]
+            .amount = _amount;
         nftContractAuctions[_nftContractAddress][_tokenId]
             .feePercentages = _feePercentages;
         nftContractAuctions[_nftContractAddress][_tokenId]
@@ -821,8 +823,8 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
             .buyNowPrice = _buyNowPrice;
         nftContractAuctions[_nftContractAddress][_tokenId]
             .whitelistedBuyer = _whitelistedBuyer;
-        nftContractAuctions[_nftContractAddress][_tokenId].nftSeller = msg
-            .sender;
+        nftContractAuctions[_nftContractAddress][_tokenId]
+            .nftSeller = msg.sender;
     }
 
     function createSale(
@@ -873,7 +875,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
                 )
             ) {
                 if (_isBuyNowPriceMet(_nftContractAddress, _tokenId)) {
-                    _transferNftToAuctionContract(
+                    _transferNftsToAuctionContract(
                         _nftContractAddress,
                         _tokenId
                     );
@@ -990,13 +992,13 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         uint256 _tokenId
     ) internal {
         if (_isBuyNowPriceMet(_nftContractAddress, _tokenId)) {
-            _transferNftToAuctionContract(_nftContractAddress, _tokenId);
+            _transferNftsToAuctionContract(_nftContractAddress, _tokenId);
             _transferNftAndPaySeller(_nftContractAddress, _tokenId);
             return;
         }
         //min price not set, nft not up for auction yet
         if (_isMinimumBidMade(_nftContractAddress, _tokenId)) {
-            _transferNftToAuctionContract(_nftContractAddress, _tokenId);
+            _transferNftsToAuctionContract(_nftContractAddress, _tokenId);
             _updateAuctionEnd(_nftContractAddress, _tokenId);
         }
     }
@@ -1382,7 +1384,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         emit MinimumPriceUpdated(_nftContractAddress, _tokenId, _newMinPrice);
 
         if (_isMinimumBidMade(_nftContractAddress, _tokenId)) {
-            _transferNftToAuctionContract(_nftContractAddress, _tokenId);
+            _transferNftsToAuctionContract(_nftContractAddress, _tokenId);
             _updateAuctionEnd(_nftContractAddress, _tokenId);
         }
     }
@@ -1404,7 +1406,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
             .buyNowPrice = _newBuyNowPrice;
         emit BuyNowPriceUpdated(_nftContractAddress, _tokenId, _newBuyNowPrice);
         if (_isBuyNowPriceMet(_nftContractAddress, _tokenId)) {
-            _transferNftToAuctionContract(_nftContractAddress, _tokenId);
+            _transferNftsToAuctionContract(_nftContractAddress, _tokenId);
             _transferNftAndPaySeller(_nftContractAddress, _tokenId);
         }
     }
@@ -1420,7 +1422,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
             _isABidMade(_nftContractAddress, _tokenId),
             "cannot payout 0 bid"
         );
-        _transferNftToAuctionContract(_nftContractAddress, _tokenId);
+        _transferNftsToAuctionContract(_nftContractAddress, _tokenId);
         _transferNftAndPaySeller(_nftContractAddress, _tokenId);
         emit HighestBidTaken(_nftContractAddress, _tokenId);
     }

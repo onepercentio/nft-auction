@@ -99,7 +99,7 @@ describe("SemiFungibleNFTAuction Bids", function () {
           .makeBid(erc1155.address, tokenId, zeroAddress, zeroERC20Tokens, {
             value: minPrice,
           })
-      ).to.be.revertedWith("Seller doesn't own NFT");
+      ).to.be.revertedWith("Insufficient sender NFT balance");
     });
     it("should revert if owner removes contract approval and minPrice is met", async function () {
       await erc1155.connect(user1).setApprovalForAll(nftAuction.address, false);
@@ -123,7 +123,7 @@ describe("SemiFungibleNFTAuction Bids", function () {
           .makeBid(erc1155.address, tokenId, zeroAddress, zeroERC20Tokens, {
             value: minPrice,
           })
-      ).to.be.revertedWith("Seller doesn't own NFT");
+      ).to.be.revertedWith("Insufficient sender NFT balance");
     });
     it("should ensure owner cannot bid on own NFT", async function () {
       await expect(
