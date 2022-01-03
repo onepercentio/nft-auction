@@ -122,13 +122,11 @@ describe("End to end auction tests", function () {
     });
 
     it("should allow multiple bids and conclude auction after end period", async function () {
-      console.log('aqui', (await erc1155.balanceOf(user1.address, tokenId)).toString())
       await nftAuction
         .connect(user2)
         .makeBid(erc1155.address, tokenId, zeroAddress, zeroERC20Tokens, {
           value: minPrice,
         });
-      console.log('aqui', (await erc1155.balanceOf(user1.address, tokenId)).toString())
       const bidIncreaseByMinPercentage =
         (minPrice * (10000 + bidIncreasePercentage)) / 10000;
       await network.provider.send("evm_increaseTime", [43200]);
@@ -137,7 +135,6 @@ describe("End to end auction tests", function () {
         .makeBid(erc1155.address, tokenId, zeroAddress, zeroERC20Tokens, {
           value: bidIncreaseByMinPercentage,
         });
-      console.log('aqui', (await erc1155.balanceOf(user1.address, tokenId)).toString())
       await expect(
         nftAuction
           .connect(user1)
