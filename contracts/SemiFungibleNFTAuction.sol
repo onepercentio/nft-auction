@@ -1035,21 +1035,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
     function _resetAuction(address _nftContractAddress, uint256 _tokenId)
         internal
     {
-        nftContractAuctions[_nftContractAddress][_tokenId].minPrice = 0;
-        nftContractAuctions[_nftContractAddress][_tokenId].amount = 0;
-        nftContractAuctions[_nftContractAddress][_tokenId].buyNowPrice = 0;
-        nftContractAuctions[_nftContractAddress][_tokenId].auctionEnd = 0;
-        nftContractAuctions[_nftContractAddress][_tokenId].auctionBidPeriod = 0;
-        nftContractAuctions[_nftContractAddress][_tokenId]
-            .bidIncreasePercentage = 0;
-        nftContractAuctions[_nftContractAddress][_tokenId].nftSeller = address(
-            0
-        );
-        nftContractAuctions[_nftContractAddress][_tokenId]
-            .whitelistedBuyer = address(0);
-        nftContractAuctions[_nftContractAddress][_tokenId].ERC20Token = address(
-            0
-        );
+        delete nftContractAuctions[_nftContractAddress][_tokenId];
     }
 
     /*
@@ -1059,11 +1045,9 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
     function _resetBids(address _nftContractAddress, uint256 _tokenId)
         internal
     {
-        nftContractAuctions[_nftContractAddress][_tokenId]
-            .nftHighestBidder = address(0);
-        nftContractAuctions[_nftContractAddress][_tokenId].nftHighestBid = 0;
-        nftContractAuctions[_nftContractAddress][_tokenId]
-            .nftRecipient = address(0);
+        delete nftContractAuctions[_nftContractAddress][_tokenId].nftHighestBidder;
+        delete nftContractAuctions[_nftContractAddress][_tokenId].nftHighestBid;
+        delete nftContractAuctions[_nftContractAddress][_tokenId].nftRecipient;
     }
 
     /**********************************/
@@ -1186,11 +1170,6 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
             _amount,
             new bytes(0)
         );
-        // IERC1155(_nftContractAddress).transferFrom(
-        //     address(this),
-        //     _nftRecipient,
-        //     _tokenId
-        // );
 
         _resetAuction(_nftContractAddress, _tokenId);
         emit NFTTransferredAndSellerPaid(
