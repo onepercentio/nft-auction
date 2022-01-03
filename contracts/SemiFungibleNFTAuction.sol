@@ -38,6 +38,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         address ERC20Token; // The seller can specify an ERC20 token that can be used to bid or purchase the NFT.
         address[] feeRecipients;
         uint32[] feePercentages;
+        bool tokensLocked;
     }
 
     /*╔═════════════════════════════╗
@@ -370,6 +371,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
     {
         uint128 minPrice = nftContractAuctions[_nftContractAddress][_tokenId]
             .minPrice;
+        console.log('highest bid', nftContractAuctions[_nftContractAddress][_tokenId].nftHighestBid);
         return
             minPrice > 0 &&
             (nftContractAuctions[_nftContractAddress][_tokenId].nftHighestBid >=
@@ -597,6 +599,8 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         address _nftContractAddress,
         uint256 _tokenId
     ) internal {
+        if (nftContractAuctions[_nftContractAddress][_tokenId].tokensLocked) return;
+
         address _nftSeller = nftContractAuctions[_nftContractAddress][_tokenId]
             .nftSeller;
         uint256 _amount = nftContractAuctions[_nftContractAddress][_tokenId]
@@ -614,6 +618,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
                 IERC1155(_nftContractAddress).balanceOf(address(this), _tokenId) == _amount + _currentBalance,
                 "nft transfer failed"
             );
+            nftContractAuctions[_nftContractAddress][_tokenId].tokensLocked = true;
         } else {
             require(
                 IERC1155(_nftContractAddress).balanceOf(address(this), _tokenId) >= _amount,
@@ -992,12 +997,14 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         uint256 _tokenId
     ) internal {
         if (_isBuyNowPriceMet(_nftContractAddress, _tokenId)) {
+            console.log('entrou no buy price');
             _transferNftsToAuctionContract(_nftContractAddress, _tokenId);
             _transferNftAndPaySeller(_nftContractAddress, _tokenId);
             return;
         }
         //min price not set, nft not up for auction yet
         if (_isMinimumBidMade(_nftContractAddress, _tokenId)) {
+            console.log('entrou no bid made');
             _transferNftsToAuctionContract(_nftContractAddress, _tokenId);
             _updateAuctionEnd(_nftContractAddress, _tokenId);
         }
@@ -1150,6 +1157,15 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         uint256 _amount = nftContractAuctions[_nftContractAddress][
             _tokenId
         ].amount;
+        console.log("file: SemiFungibleNFTAuction.sol ~ line 1151 ~ _amount", _amount);
+        console.log("file: SemiFungibleNFTAuction.sol ~ line 1151 ~ balance", IERC1155(_nftContractAddress).balanceOf(
+            address(this),
+            _tokenId
+        ));
+        console.log("file: SemiFungibleNFTAuction.sol ~ line 1151 ~ balance", IERC1155(_nftContractAddress).balanceOf(
+           _nftSeller,
+            _tokenId
+        ));
         address _nftRecipient = _getNftRecipient(_nftContractAddress, _tokenId);
         uint128 _nftHighestBid = nftContractAuctions[_nftContractAddress][
             _tokenId

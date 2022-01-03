@@ -4,7 +4,7 @@ const { BigNumber } = require("ethers");
 const { network } = require("hardhat");
 
 const tokenId = 1;
-const nftAmount = 1;
+const nftAmount = 3;
 const minPrice = 10000;
 const newPrice = 15000;
 const buyNowPrice = 100000;
@@ -38,7 +38,7 @@ describe("End to end auction tests", function () {
 
     erc1155 = await ERC1155.deploy("my mockables", "MBA");
     await erc1155.deployed();
-    await erc1155.mint(user1.address, tokenId, 1, emptyBytes);
+    await erc1155.mint(user1.address, tokenId, 10, emptyBytes);
 
     nftAuction = await NFTAuction.deploy();
     await nftAuction.deployed();
@@ -101,7 +101,7 @@ describe("End to end auction tests", function () {
       expect(await erc1155.balanceOf(user3.address, tokenId)).to.equal(1);
     });
   });
-  describe("Custom auction end to end", async function () {
+  describe.only("Custom auction end to end", async function () {
     bidIncreasePercentage = 2000;
     auctionBidPeriod = 106400;
     beforeEach(async function () {
@@ -120,12 +120,15 @@ describe("End to end auction tests", function () {
           emptyFeePercentages
         );
     });
+
     it("should allow multiple bids and conclude auction after end period", async function () {
-      nftAuction
+      console.log('aqui', (await erc1155.balanceOf(user1.address, tokenId)).toString())
+      await nftAuction
         .connect(user2)
         .makeBid(erc1155.address, tokenId, zeroAddress, zeroERC20Tokens, {
           value: minPrice,
         });
+      console.log('aqui', (await erc1155.balanceOf(user1.address, tokenId)).toString())
       const bidIncreaseByMinPercentage =
         (minPrice * (10000 + bidIncreasePercentage)) / 10000;
       await network.provider.send("evm_increaseTime", [43200]);
@@ -134,6 +137,7 @@ describe("End to end auction tests", function () {
         .makeBid(erc1155.address, tokenId, zeroAddress, zeroERC20Tokens, {
           value: bidIncreaseByMinPercentage,
         });
+      console.log('aqui', (await erc1155.balanceOf(user1.address, tokenId)).toString())
       await expect(
         nftAuction
           .connect(user1)
@@ -180,7 +184,9 @@ describe("End to end auction tests", function () {
           )
       ).to.be.revertedWith("Auction has ended");
       await nftAuction.connect(user3).settleAuction(erc1155.address, tokenId);
-      expect(await erc1155.balanceOf(user3.address, tokenId)).to.equal(1);
+      expect(await erc1155.balanceOf(user3.address, tokenId)).to.equal(nftAmount);
+      expect(await erc1155.balanceOf(user2.address, tokenId)).to.equal(0);
+      expect(await erc1155.balanceOf(user1.address, tokenId)).to.equal(7);
     });
   });
   describe("Early bid auction end to end", async function () {

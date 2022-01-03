@@ -79,6 +79,32 @@ describe("ERC20 New Auction Tests", function () {
     expect(await erc1155.balanceOf(user1.address, tokenId)).to.equal(1);
   });
 
+  it("should allow user to create auction with fracionable tokens", async function () {
+    const amount = BigNumber.from(10)
+
+    await erc1155.mint(user1.address, tokenId, 9, emptyBytes);
+    expect(await erc1155.balanceOf(user1.address, tokenId)).to.equal(amount);
+
+    await nftAuction
+      .connect(user1)
+      .createNewNftAuction(
+        erc1155.address,
+        tokenId,
+        amount,
+        erc20.address,
+        minPrice,
+        buyNowPrice,
+        auctionBidPeriod,
+        bidIncreasePercentage,
+        emptyFeeRecipients,
+        emptyFeePercentages
+      );
+    
+    const auction = await nftAuction.nftContractAuctions(erc1155.address, tokenId);
+    
+    expect(auction.amount.toString()).to.eql(amount.toString());
+  });
+
   it("should not allow minimum bid increase percentage below minimum settable value", async function () {
     await expect(
       nftAuction
