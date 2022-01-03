@@ -599,6 +599,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         address _nftContractAddress,
         uint256 _tokenId
     ) internal {
+        // if tokens have been locked, just return
         if (nftContractAuctions[_nftContractAddress][_tokenId].tokensLocked) return;
 
         address _nftSeller = nftContractAuctions[_nftContractAddress][_tokenId]
@@ -606,6 +607,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         uint256 _amount = nftContractAuctions[_nftContractAddress][_tokenId]
             .amount;
         uint256 _currentBalance = IERC1155(_nftContractAddress).balanceOf(address(this), _tokenId);
+
         if (IERC1155(_nftContractAddress).balanceOf(_nftSeller, _tokenId) >= _amount) {
             IERC1155(_nftContractAddress).safeTransferFrom(
                 _nftSeller,
