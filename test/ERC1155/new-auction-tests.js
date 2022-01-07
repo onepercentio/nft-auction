@@ -2,6 +2,8 @@ const { expect } = require("chai");
 
 const { BigNumber } = require("ethers");
 
+const getAuctionId = require('../helpers/getAuctionId')
+
 const tokenId = 1;
 const nftAmount = 1;
 const minPrice = 100;
@@ -16,7 +18,7 @@ const emptyFeeRecipients = [];
 const emptyFeePercentages = [];
 // Deploy and create a mock erc1155 contract.
 // 1 basic test, NFT sent from one person to another works correctly.
-describe("SemiFungibleNFTAuction", function () {
+describe.only("SemiFungibleNFTAuction", function () {
   let ERC1155;
   let erc1155;
   let NFTAuction;
@@ -51,7 +53,7 @@ describe("SemiFungibleNFTAuction", function () {
   });
 
   it("Calling newNftAuction creates auction", async function () {
-    await nftAuction
+    const tx = await nftAuction
       .connect(user1)
       .createNewNftAuction(
         erc1155.address,
@@ -65,7 +67,8 @@ describe("SemiFungibleNFTAuction", function () {
         emptyFeeRecipients,
         emptyFeePercentages
       );
-    let result = await nftAuction.nftContractAuctions(erc1155.address, tokenId);
+    const auctionId = getAuctionId(tx)
+    let result = await nftAuction.nftContractAuctions(erc1155.address, tokenId, auctionId);
     expect(result.nftSeller).to.equal(user1.address);
   });
   it("transferring nft token directly to contract", async function () {
@@ -132,7 +135,7 @@ describe("SemiFungibleNFTAuction", function () {
   });
 
   it("should allow seller to create default Auction", async function () {
-    await nftAuction
+    const tx = await nftAuction
       .connect(user1)
       .createDefaultNftAuction(
         erc1155.address,
@@ -143,11 +146,12 @@ describe("SemiFungibleNFTAuction", function () {
         emptyFeeRecipients,
         emptyFeePercentages
       );
-    let result = await nftAuction.nftContractAuctions(erc1155.address, tokenId);
+    const auctionId = await getAuctionId(tx)
+    let result = await nftAuction.nftContractAuctions(erc1155.address, tokenId, auctionId);
     expect(result.nftSeller).to.equal(user1.address);
   });
   it("should allow seller to set 0 buyNowPrice", async function () {
-    await nftAuction
+    const tx = await nftAuction
       .connect(user1)
       .createDefaultNftAuction(
         erc1155.address,
@@ -158,11 +162,12 @@ describe("SemiFungibleNFTAuction", function () {
         emptyFeeRecipients,
         emptyFeePercentages
       );
-    let result = await nftAuction.nftContractAuctions(erc1155.address, tokenId);
+    const auctionId = await getAuctionId(tx)
+    let result = await nftAuction.nftContractAuctions(erc1155.address, tokenId, auctionId);
     expect(result.nftSeller).to.equal(user1.address);
   });
   it("should allow seller to specify fees", async function () {
-    await nftAuction
+    const tx = await nftAuction
       .connect(user1)
       .createDefaultNftAuction(
         erc1155.address,
@@ -173,7 +178,8 @@ describe("SemiFungibleNFTAuction", function () {
         feeRecipients,
         feePercentages
       );
-    let result = await nftAuction.nftContractAuctions(erc1155.address, tokenId);
+      const auctionId = await getAuctionId(tx)
+    let result = await nftAuction.nftContractAuctions(erc1155.address, tokenId, auctionId);
     expect(result.nftSeller).to.equal(user1.address);
   });
   it("should revert if fees exceed 100%", async function () {
@@ -210,8 +216,10 @@ describe("SemiFungibleNFTAuction", function () {
   });
 
   describe("Test when no bids made on new auction", function () {
+    let auctionId
+
     beforeEach(async function () {
-      await nftAuction
+      const tx = await nftAuction
         .connect(user1)
         .createDefaultNftAuction(
           erc1155.address,
@@ -222,6 +230,7 @@ describe("SemiFungibleNFTAuction", function () {
           emptyFeeRecipients,
           emptyFeePercentages
         );
+      auctionId = await getAuctionId(tx)
     });
     it("should not allow owner to create another auction", async function () {
       await expect(
@@ -242,13 +251,14 @@ describe("SemiFungibleNFTAuction", function () {
       await erc1155.connect(user1).setApprovalForAll(user2.address, true);
       await erc1155
         .connect(user1)
-        .safeTransferFrom(user1.address, user2.address, tokenId, 1, emptyBytes);
+        .safeTransferFrom(user1.address, user2.address, tokenId, emptyBytes);
       let result = await nftAuction.nftContractAuctions(
         erc1155.address,
-        tokenId
+        tokenId,
+        auctionId
       );
       expect(result.nftSeller).to.be.equal(user1.address);
-      await nftAuction
+      const tx = await nftAuction
         .connect(user2)
         .createDefaultNftAuction(
           erc1155.address,
@@ -259,8 +269,8 @@ describe("SemiFungibleNFTAuction", function () {
           emptyFeeRecipients,
           emptyFeePercentages
         );
-
-      result = await nftAuction.nftContractAuctions(erc1155.address, tokenId);
+      auctionId = await getAuctionId(tx)
+      result = await nftAuction.nftContractAuctions(erc1155.address, tokenId, auctionId);
       expect(result.nftSeller).to.be.equal(user2.address);
       expect(result.minPrice.toString()).to.be.equal(
         BigNumber.from(newMinPrice).toString()

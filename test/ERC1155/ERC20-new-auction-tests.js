@@ -2,6 +2,8 @@ const { expect } = require("chai");
 
 const { BigNumber } = require("ethers");
 
+const getAuctionId = require('../helpers/getAuctionId')
+
 const tokenId = 1;
 const nftAmount = 1;
 const minPrice = 100;
@@ -79,13 +81,13 @@ describe("ERC20 New Auction Tests", function () {
     expect(await erc1155.balanceOf(user1.address, tokenId)).to.equal(1);
   });
 
-  it("should allow user to create auction with fracionable tokens", async function () {
+  it("should allow holder to create auction with fracionable tokens", async function () {
     const amount = BigNumber.from(10)
 
     await erc1155.mint(user1.address, tokenId, 9, emptyBytes);
     expect(await erc1155.balanceOf(user1.address, tokenId)).to.equal(amount);
 
-    await nftAuction
+    const tx = await nftAuction
       .connect(user1)
       .createNewNftAuction(
         erc1155.address,
@@ -100,9 +102,59 @@ describe("ERC20 New Auction Tests", function () {
         emptyFeePercentages
       );
     
-    const auction = await nftAuction.nftContractAuctions(erc1155.address, tokenId);
+    const auctionId = await getAuctionId(tx)
+    const auction = await nftAuction.nftContractAuctions(erc1155.address, tokenId, auctionId);
     
     expect(auction.amount.toString()).to.eql(amount.toString());
+  });
+
+  it("should allow two different holders auction their tokens", async function () {
+    const amount = BigNumber.from(10)
+
+    await erc1155.mint(user1.address, tokenId, 9, emptyBytes);
+    await erc1155.mint(user2.address, tokenId, amount, emptyBytes);
+
+    expect(await erc1155.balanceOf(user1.address, tokenId)).to.equal(amount);
+    expect(await erc1155.balanceOf(user2.address, tokenId)).to.equal(amount);
+
+    const tx1 = await nftAuction
+      .connect(user1)
+      .createNewNftAuction(
+        erc1155.address,
+        tokenId,
+        amount,
+        erc20.address,
+        minPrice,
+        buyNowPrice,
+        auctionBidPeriod,
+        bidIncreasePercentage,
+        emptyFeeRecipients,
+        emptyFeePercentages
+      );
+
+    const tx2 = await nftAuction
+      .connect(user2)
+      .createNewNftAuction(
+        erc1155.address,
+        tokenId,
+        amount,
+        erc20.address,
+        minPrice,
+        buyNowPrice,
+        auctionBidPeriod,
+        bidIncreasePercentage,
+        emptyFeeRecipients,
+        emptyFeePercentages
+      );
+
+    const auctionId1 = await getAuctionId(tx1)
+    const auctionId2 = await getAuctionId(tx2)
+
+    const auction1 = await nftAuction.nftContractAuctions(erc1155.address, tokenId, auctionId1);
+    const auction2 = await nftAuction.nftContractAuctions(erc1155.address, tokenId, auctionId2);
+
+    expect(auction1.nftSeller).to.eql(user1.address)
+    expect(auction2.nftSeller).to.eql(user2.address)
   });
 
   it("should not allow minimum bid increase percentage below minimum settable value", async function () {
@@ -144,7 +196,7 @@ describe("ERC20 New Auction Tests", function () {
   });
 
   it("should allow seller to create default Auction", async function () {
-    await nftAuction
+    const tx = await nftAuction
       .connect(user1)
       .createDefaultNftAuction(
         erc1155.address,
@@ -156,7 +208,8 @@ describe("ERC20 New Auction Tests", function () {
         emptyFeePercentages
       );
 
-    let result = await nftAuction.nftContractAuctions(erc1155.address, tokenId);
+    const auctionId = await getAuctionId(tx)
+    let result = await nftAuction.nftContractAuctions(erc1155.address, tokenId, auctionId);
 
     expect(result.nftSeller).to.equal(user1.address);
   });
@@ -199,8 +252,9 @@ describe("ERC20 New Auction Tests", function () {
   });
 
   describe("Test when no bids made on new auction", function () {
+    let auctionId
     beforeEach(async function () {
-      await nftAuction
+      const tx = await nftAuction
         .connect(user1)
         .createDefaultNftAuction(
           erc1155.address,
@@ -211,46 +265,51 @@ describe("ERC20 New Auction Tests", function () {
           emptyFeeRecipients,
           emptyFeePercentages
         );
+
+      auctionId = getAuctionId(tx)
     });
     it("should allow seller to withdraw Auction if no bids made", async function () {
       let result = await nftAuction.nftContractAuctions(
         erc1155.address,
-        tokenId
+        tokenId,
+        auctionId
       );
       expect(result.nftSeller).to.be.equal(user1.address);
-      expect(await erc1155.balanceOf(user1.address, tokenId)).to.equal(1);
-      await nftAuction.connect(user1).withdrawAuction(erc1155.address, tokenId);
+      expect(await erc1155.balanceOf(user1.address, tokenId, auctionId)).to.equal(1);
+      await nftAuction.connect(user1).withdrawAuction(erc1155.address, tokenId, auctionId);
 
-      result = await nftAuction.nftContractAuctions(erc1155.address, tokenId);
+      result = await nftAuction.nftContractAuctions(erc1155.address, tokenId, auctionId);
       expect(result.nftSeller).to.be.equal(zeroAddress);
     });
     it("should reset auction when NFT withdrawn", async function () {
-      await nftAuction.connect(user1).withdrawAuction(erc1155.address, tokenId);
+      await nftAuction.connect(user1).withdrawAuction(erc1155.address, tokenId, auctionId);
       let result = await nftAuction.nftContractAuctions(
         erc1155.address,
-        tokenId
+        tokenId,
+        auctionId
       );
       expect(result.ERC20Token).to.be.equal(zeroAddress);
     });
     it("should not allow other users to reset auction", async function () {
       await expect(
-        nftAuction.connect(user2).withdrawAuction(erc1155.address, tokenId)
+        nftAuction.connect(user2).withdrawAuction(erc1155.address, tokenId, auctionId)
       ).to.be.revertedWith("Not NFT owner");
     });
     it("should revert when trying to update whitelisted buyer", async function () {
       await expect(
         nftAuction
           .connect(user1)
-          .updateWhitelistedBuyer(erc1155.address, tokenId, user3.address)
+          .updateWhitelistedBuyer(erc1155.address, tokenId, auctionId, user3.address)
       ).to.be.revertedWith("Not a sale");
     });
     it("should allow seller to update minimum price", async function () {
       await nftAuction
         .connect(user1)
-        .updateMinimumPrice(erc1155.address, tokenId, newMinPrice);
+        .updateMinimumPrice(erc1155.address, tokenId, auctionId, newMinPrice);
       let result = await nftAuction.nftContractAuctions(
         erc1155.address,
-        tokenId
+        tokenId,
+        auctionId
       );
       expect(result.minPrice.toString()).to.be.equal(
         BigNumber.from(newMinPrice).toString()
@@ -260,21 +319,22 @@ describe("ERC20 New Auction Tests", function () {
       await expect(
         nftAuction
           .connect(user1)
-          .updateMinimumPrice(erc1155.address, tokenId, buyNowPrice + 1)
+          .updateMinimumPrice(erc1155.address, tokenId, auctionId, buyNowPrice + 1)
       ).to.be.revertedWith("MinPrice > 80% of buyNowPrice");
     });
     it("should not allow seller to take highest bid when no bid made", async function () {
       await expect(
-        nftAuction.connect(user1).takeHighestBid(erc1155.address, tokenId)
+        nftAuction.connect(user1).takeHighestBid(erc1155.address, tokenId, auctionId)
       ).to.be.revertedWith("cannot payout 0 bid");
     });
     it("should allow seller to update buy now price", async function () {
       await nftAuction
         .connect(user1)
-        .updateBuyNowPrice(erc1155.address, tokenId, newBuyNowPrice);
+        .updateBuyNowPrice(erc1155.address, tokenId, auctionId, newBuyNowPrice);
       let result = await nftAuction.nftContractAuctions(
         erc1155.address,
-        tokenId
+        tokenId,
+        auctionId
       );
       expect(result.buyNowPrice.toString()).to.be.equal(
         BigNumber.from(newBuyNowPrice).toString()
@@ -284,7 +344,7 @@ describe("ERC20 New Auction Tests", function () {
       await expect(
         nftAuction
           .connect(user2)
-          .updateMinimumPrice(erc1155.address, tokenId, newMinPrice)
+          .updateMinimumPrice(erc1155.address, tokenId, auctionId, newMinPrice)
       ).to.be.revertedWith("Only nft seller");
     });
   });
