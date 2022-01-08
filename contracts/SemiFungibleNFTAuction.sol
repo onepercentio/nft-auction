@@ -35,12 +35,8 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
 
     mapping(uint256 => Auction) public auctions;
     mapping(bytes32 => EnumerableSet.UintSet) private activeAuctionsByToken;
-    mapping(address => EnumerableSet.Bytes32Set) private activeAuctionsByHolder;
     mapping(address => EnumerableSet.UintSet) private activeAuctionIdsByHolder;
-
-    // reference auction by its id
-    // look for active auctions by holder
-    // look for active auctions by hash(token address + token id)
+    mapping(address => EnumerableSet.Bytes32Set) private activeAuctionHashesByHolder;
 
     enum AUCTION_STATUS {
         ACTIVE,
@@ -78,10 +74,6 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         address[] feeRecipients;
         uint32[] feePercentages;
     }
-
-    // /*╔═════════════════════════════╗
-    //   ║           EVENTS            ║
-    //   ╚═════════════════════════════╝*/
 
     event NftAuctionCreated(Auction auction);
 
@@ -357,7 +349,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
      * PUBLIC READ METHODS                           *
      *************************************************/
 
-    function getActiveAuctionsByHolder(address _holder)
+    function getActiveAuctionHashesByHolder(address _holder)
         external
         view
         returns (Auction[] memory activeAuctions)
@@ -399,7 +391,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
 
         activeAuctionsByToken[tokenHash].add(_auctionId);
         activeAuctionIdsByHolder[_auction.nftSeller].add(_auctionId);
-        activeAuctionsByHolder[_auction.nftSeller].add(tokenHash);
+        activeAuctionHashesByHolder[_auction.nftSeller].add(tokenHash);
     }
 
     function _removeActiveAuction(uint256 _auctionId, Auction memory _auction)
@@ -409,7 +401,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
 
         activeAuctionsByToken[tokenHash].remove(_auctionId);
         activeAuctionIdsByHolder[_auction.nftSeller].remove(_auctionId);
-        activeAuctionsByHolder[_auction.nftSeller].remove(tokenHash);
+        activeAuctionHashesByHolder[_auction.nftSeller].remove(tokenHash);
     }
 
     function _lockNFT(Auction memory _auction) internal {
@@ -556,7 +548,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         require(_newAuction.erc20Token != address(0), "Invalid token address");
         require(_newAuction.feeRecipients.length == _newAuction.feePercentages.length, "Recipients != percentages");
         require(
-            !activeAuctionsByHolder[msg.sender].contains(_hashToken(_newAuction.nftContractAddress, _newAuction.tokenId)),
+            !activeAuctionHashesByHolder[msg.sender].contains(_hashToken(_newAuction.nftContractAddress, _newAuction.tokenId)),
             "Sender has an active auction for this token"
         );
     }
