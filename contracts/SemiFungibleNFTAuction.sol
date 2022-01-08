@@ -190,54 +190,9 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         _;
     }
 
-    function _isAuctionOngoing(uint256 _auctionId)
-        internal
-        view
-        returns (bool)
-    {
-        return (block.timestamp >= auctions[_auctionId].start && block.timestamp <= auctions[_auctionId].end);
-    }
-
-    /*
-     * Check if a bid has been made.
-     */
-    function _isABidMade(uint256 _auctionId)
-        internal
-        view
-        returns (bool)
-    {
-        return auctions[_auctionId].highestBid > 0;
-    }
-
-    /*
-     *if the minPrice is set by the seller, check that the highest bid meets or exceeds that price.
-     */
-    function _isMinimumBidMade(uint256 _auctionId)
-        internal
-        view
-        returns (bool)
-    {
-        Auction memory auction = auctions[_auctionId];
-        return auction.minPrice > 0 && (auction.highestBid >= auction.minPrice);
-    }
-
-    function _validateNewAuction(NewAuctionRequest memory _newAuction)
-        internal
-        view
-        isFeePercentagesLessThanMaximum(_newAuction.feePercentages)
-    {
-        require(_newAuction.amount > 0, "Amount cannot be zero");
-        require(_newAuction.minPrice > 0, "Price cannot be zero");
-        require(_newAuction.bidIncreasePercentage > 0, "Bid increase percentage cannot be zero");
-        require(_newAuction.start >= block.timestamp, "Invalid start time");
-        require(_newAuction.end >= _newAuction.start, "Invalid end time");
-        require(_newAuction.erc20Token != address(0), "Invalid token address");
-        require(_newAuction.feeRecipients.length == _newAuction.feePercentages.length, "Recipients != percentages");
-        require(
-            !activeAuctionsByHolder[msg.sender].contains(_hashToken(_newAuction.nftContractAddress, _newAuction.tokenId)),
-            "Sender has an active auction for this token"
-        );
-    }
+    /*************************************************
+     * PUBLIC WRITE METHODS                          *
+     *************************************************/
 
     function createNewNftAuction(NewAuctionRequest calldata _newAuction)
         external
@@ -279,55 +234,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         emit NftAuctionCreated(auction);
     }
 
-    function _addActiveAuction(uint256 _auctionId, Auction memory _auction)
-        internal
-    {
-        bytes32 tokenHash = _hashToken(_auction.nftContractAddress, _auction.tokenId);
-
-        activeAuctionsByToken[tokenHash].add(_auctionId);
-        activeAuctionIdsByHolder[_auction.nftSeller].add(_auctionId);
-        activeAuctionsByHolder[_auction.nftSeller].add(tokenHash);
-    }
-
-    function _removeActiveAuction(uint256 _auctionId, Auction memory _auction)
-        internal
-    {
-        bytes32 tokenHash = _hashToken(_auction.nftContractAddress, _auction.tokenId);
-
-        activeAuctionsByToken[tokenHash].remove(_auctionId);
-        activeAuctionIdsByHolder[_auction.nftSeller].remove(_auctionId);
-        activeAuctionsByHolder[_auction.nftSeller].remove(tokenHash);
-    }
-
-    function _lockNFT(Auction memory _auction) internal {
-        IERC1155 nftContract = IERC1155(_auction.nftContractAddress);
-
-        uint256 balanceBeforeTransfer = nftContract.balanceOf(address(this), _auction.tokenId);
-
-        nftContract.safeTransferFrom(
-            _auction.nftSeller,
-            address(this),
-            _auction.tokenId,
-            _auction.amount,
-            new bytes(0)
-        );
-
-        uint256 balanceAfterTransfer = nftContract.balanceOf(address(this), _auction.tokenId);
-
-        require(balanceAfterTransfer == balanceBeforeTransfer + _auction.amount, "NFT transfer failed");
-    }
-
-    function _hashToken(address _nftContractAddress, uint256 _tokenId)
-        internal
-        pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encode(_nftContractAddress, _tokenId));
-    }
-
-    /********************************************************************
-     * Make bids with ERC20 Token specified by the NFT seller.          *
-     ********************************************************************/
+    /// @dev  Make bids with ERC20 Token specified by the NFT seller.
     function bid(
         uint256 _auctionId,
         address _erc20Token,
@@ -366,95 +273,6 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
             _erc20Token,
             _tokenAmount
         );
-    }
-
-    function _lockERC20Tokens(address _erc20Token, uint256 _tokenAmount) internal {
-        IERC20 erc20Contract = IERC20(_erc20Token);
-
-        uint256 balanceBeforeTransfer = erc20Contract.balanceOf(address(this));
-
-        IERC20(_erc20Token).transferFrom(
-            msg.sender,
-            address(this),
-            _tokenAmount
-        );
-
-        uint256 balanceAfterTransfer = erc20Contract.balanceOf(address(this));
-
-        require(balanceAfterTransfer == balanceBeforeTransfer + _tokenAmount, "ERC20 transfer failed");
-    }
-
-    function _maybeExtendAuctionEnd(uint256 _auctionId) internal {
-        Auction memory auction = auctions[_auctionId];
-        if (block.timestamp > auction.end - defaultBidExtendPeriod) {
-            auction.end += defaultBidExtendPeriod;
-
-            emit AuctionEndUpdated(_auctionId, auction.end);
-        }
-    }
-
-    function _transferNftAndPaySeller(uint256 _auctionId) internal {
-        Auction memory auction = auctions[_auctionId];
-
-        _payFeesAndSeller(auction);
-
-        IERC1155(auction.nftContractAddress).safeTransferFrom(
-            address(this),
-            auction.highestBidder,
-            auction.tokenId,
-            auction.amount,
-            new bytes(0)
-        );
-
-        emit NFTTransferredAndSellerPaid(
-            auction.nftContractAddress,
-            auction.tokenId,
-            auction.amount,
-            auction.nftSeller,
-            auction.highestBid,
-            auction.highestBidder
-        );
-    }
-
-    /// @dev transfer back tokens to their original owners
-    function _unlockTokens(Auction memory _auction) internal {
-        IERC1155(_auction.nftContractAddress).safeTransferFrom(
-            address(this),
-            _auction.nftSeller,
-            _auction.tokenId,
-            _auction.amount,
-            new bytes(0)
-        );
-
-        if (_auction.highestBidder != address(0)) {
-            IERC20(_auction.ERC20Token).transfer(
-                _auction.highestBidder,
-                _auction.highestBid
-            );
-        }
-    }
-
-    function _payFeesAndSeller(Auction memory _auction) internal {
-        uint256 feesPaid;
-        // pay fees
-        for (uint256 i = 0; i < _auction.feeRecipients.length; i++) {
-            uint256 fee = _calculateFee(_auction.highestBid, _auction.feePercentages[i]);
-            IERC20(_auction.ERC20Token).transfer(_auction.feeRecipients[i], fee);
-            feesPaid += fee;
-        }
-        // pay seller
-        IERC20(_auction.ERC20Token).transfer(_auction.nftSeller, (_auction.highestBid - feesPaid));
-    }
-
-    /*
-     * Returns the percentage of the total bid (used to calculate fee payments)
-     */
-    function _calculateFee(uint256 _totalBid, uint256 _percentage)
-        internal
-        pure
-        returns (uint256)
-    {
-        return (_totalBid * (_percentage)) / 10000;
     }
 
     function settleAuction(uint256 _auctionId)
@@ -535,9 +353,9 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         _removeActiveAuction(_auctionId, auction);
     }
 
-    /**
-     * Auction getters
-     */
+    /*************************************************
+     * PUBLIC READ METHODS                           *
+     *************************************************/
 
     function getActiveAuctionsByHolder(address _holder)
         external
@@ -568,6 +386,198 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         }
 
         return list;
+    }
+
+    /*************************************************
+     * INTERNAL WRITE METHODS                        *
+     *************************************************/
+
+    function _addActiveAuction(uint256 _auctionId, Auction memory _auction)
+        internal
+    {
+        bytes32 tokenHash = _hashToken(_auction.nftContractAddress, _auction.tokenId);
+
+        activeAuctionsByToken[tokenHash].add(_auctionId);
+        activeAuctionIdsByHolder[_auction.nftSeller].add(_auctionId);
+        activeAuctionsByHolder[_auction.nftSeller].add(tokenHash);
+    }
+
+    function _removeActiveAuction(uint256 _auctionId, Auction memory _auction)
+        internal
+    {
+        bytes32 tokenHash = _hashToken(_auction.nftContractAddress, _auction.tokenId);
+
+        activeAuctionsByToken[tokenHash].remove(_auctionId);
+        activeAuctionIdsByHolder[_auction.nftSeller].remove(_auctionId);
+        activeAuctionsByHolder[_auction.nftSeller].remove(tokenHash);
+    }
+
+    function _lockNFT(Auction memory _auction) internal {
+        IERC1155 nftContract = IERC1155(_auction.nftContractAddress);
+
+        uint256 balanceBeforeTransfer = nftContract.balanceOf(address(this), _auction.tokenId);
+
+        nftContract.safeTransferFrom(
+            _auction.nftSeller,
+            address(this),
+            _auction.tokenId,
+            _auction.amount,
+            new bytes(0)
+        );
+
+        uint256 balanceAfterTransfer = nftContract.balanceOf(address(this), _auction.tokenId);
+
+        require(balanceAfterTransfer == balanceBeforeTransfer + _auction.amount, "NFT transfer failed");
+    }
+
+    function _lockERC20Tokens(address _erc20Token, uint256 _tokenAmount) internal {
+        IERC20 erc20Contract = IERC20(_erc20Token);
+
+        uint256 balanceBeforeTransfer = erc20Contract.balanceOf(address(this));
+
+        IERC20(_erc20Token).transferFrom(
+            msg.sender,
+            address(this),
+            _tokenAmount
+        );
+
+        uint256 balanceAfterTransfer = erc20Contract.balanceOf(address(this));
+
+        require(balanceAfterTransfer == balanceBeforeTransfer + _tokenAmount, "ERC20 transfer failed");
+    }
+
+     /// @dev transfer back tokens to their original owners
+    function _unlockTokens(Auction memory _auction) internal {
+        IERC1155(_auction.nftContractAddress).safeTransferFrom(
+            address(this),
+            _auction.nftSeller,
+            _auction.tokenId,
+            _auction.amount,
+            new bytes(0)
+        );
+
+        if (_auction.highestBidder != address(0)) {
+            IERC20(_auction.ERC20Token).transfer(
+                _auction.highestBidder,
+                _auction.highestBid
+            );
+        }
+    }
+
+    function _transferNftAndPaySeller(uint256 _auctionId) internal {
+        Auction memory auction = auctions[_auctionId];
+
+        _payFeesAndSeller(auction);
+
+        IERC1155(auction.nftContractAddress).safeTransferFrom(
+            address(this),
+            auction.highestBidder,
+            auction.tokenId,
+            auction.amount,
+            new bytes(0)
+        );
+
+        emit NFTTransferredAndSellerPaid(
+            auction.nftContractAddress,
+            auction.tokenId,
+            auction.amount,
+            auction.nftSeller,
+            auction.highestBid,
+            auction.highestBidder
+        );
+    }
+
+    function _payFeesAndSeller(Auction memory _auction) internal {
+        uint256 feesPaid;
+        // pay fees
+        for (uint256 i = 0; i < _auction.feeRecipients.length; i++) {
+            uint256 fee = _calculateFee(_auction.highestBid, _auction.feePercentages[i]);
+            IERC20(_auction.ERC20Token).transfer(_auction.feeRecipients[i], fee);
+            feesPaid += fee;
+        }
+        // pay seller
+        IERC20(_auction.ERC20Token).transfer(_auction.nftSeller, (_auction.highestBid - feesPaid));
+    }
+
+    function _maybeExtendAuctionEnd(uint256 _auctionId) internal {
+        Auction memory auction = auctions[_auctionId];
+        if (block.timestamp > auction.end - defaultBidExtendPeriod) {
+            auction.end += defaultBidExtendPeriod;
+
+            emit AuctionEndUpdated(_auctionId, auction.end);
+        }
+    }
+
+    /*************************************************
+     * INTERNAL READ METHODS                         *
+     *************************************************/
+
+    function _isAuctionOngoing(uint256 _auctionId)
+        internal
+        view
+        returns (bool)
+    {
+        return (block.timestamp >= auctions[_auctionId].start && block.timestamp <= auctions[_auctionId].end);
+    }
+
+    /*
+     * Check if a bid has been made.
+     */
+    function _isABidMade(uint256 _auctionId)
+        internal
+        view
+        returns (bool)
+    {
+        return auctions[_auctionId].highestBid > 0;
+    }
+
+    /*
+     *if the minPrice is set by the seller, check that the highest bid meets or exceeds that price.
+     */
+    function _isMinimumBidMade(uint256 _auctionId)
+        internal
+        view
+        returns (bool)
+    {
+        Auction memory auction = auctions[_auctionId];
+        return auction.minPrice > 0 && (auction.highestBid >= auction.minPrice);
+    }
+
+    function _validateNewAuction(NewAuctionRequest memory _newAuction)
+        internal
+        view
+        isFeePercentagesLessThanMaximum(_newAuction.feePercentages)
+    {
+        require(_newAuction.amount > 0, "Amount cannot be zero");
+        require(_newAuction.minPrice > 0, "Price cannot be zero");
+        require(_newAuction.bidIncreasePercentage > 0, "Bid increase percentage cannot be zero");
+        require(_newAuction.start >= block.timestamp, "Invalid start time");
+        require(_newAuction.end >= _newAuction.start, "Invalid end time");
+        require(_newAuction.erc20Token != address(0), "Invalid token address");
+        require(_newAuction.feeRecipients.length == _newAuction.feePercentages.length, "Recipients != percentages");
+        require(
+            !activeAuctionsByHolder[msg.sender].contains(_hashToken(_newAuction.nftContractAddress, _newAuction.tokenId)),
+            "Sender has an active auction for this token"
+        );
+    }
+
+    function _hashToken(address _nftContractAddress, uint256 _tokenId)
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(_nftContractAddress, _tokenId));
+    }
+
+    /*
+     * Returns the percentage of the total bid (used to calculate fee payments)
+     */
+    function _calculateFee(uint256 _totalBid, uint256 _percentage)
+        internal
+        pure
+        returns (uint256)
+    {
+        return (_totalBid * (_percentage)) / 10000;
     }
 
 }
