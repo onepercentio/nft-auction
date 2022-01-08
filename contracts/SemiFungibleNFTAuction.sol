@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
 
 /// @title An Auction Contract for bidding and selling single and batched NFTs
 /// @author Avo Labs GmbH
@@ -13,6 +15,8 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 contract SemiFungibleNFTAuction is ERC1155Holder {
 
     using Counters for Counters.Counter;
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     /*
      * Default values that are used if not specified by the NFT seller.
      */
@@ -25,6 +29,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
 
     Counters.Counter public _ids;
 
+    mapping(bytes32 => EnumerableSet.AddressSet) private _roleMembers;
     // @dev tokenAddress => tokenId => auctionId => auction
     mapping(address => mapping(uint256 => mapping(uint256 => Auction))) public nftContractAuctions;
     // fractionable NFTs can have multiple active auctions but only one by holder
@@ -54,19 +59,6 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
       ╚═════════════════════════════╝*/
 
     event NftAuctionCreated(Auction auction);
-
-    // event SaleCreated(
-    //     address nftContractAddress,
-    //     uint256 tokenId,
-    //     uint256 id,
-    //     uint256 amount,
-    //     address nftSeller,
-    //     address erc20Token,
-    //     uint256 buyNowPrice,
-    //     address whitelistedBuyer,
-    //     address[] feeRecipients,
-    //     uint32[] feePercentages
-    // );
 
     event BidMade(
         address nftContractAddress,
@@ -412,6 +404,8 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
 
         nftContractAuctions[_nftContractAddress][_tokenId][auctionId] = auction;
 
+        activeAuctionsByHolder[msg.sender][_nftContractAddress][_tokenId] = auctionId;
+
         _lockNFT(auction, _nftContractAddress, _tokenId);
 
         emit NftAuctionCreated(auction);
@@ -428,138 +422,6 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
 
         _auction.tokensLocked = true;
     }
-
-    /**********************************/
-    /*╔══════════════════════════════╗
-      ║             END              ║
-      ║       AUCTION CREATION       ║
-      ╚══════════════════════════════╝*/
-    /**********************************/
-
-    /*╔══════════════════════════════╗
-      ║            SALES             ║
-      ╚══════════════════════════════╝*/
-
-    /********************************************************************
-     * Allows for a standard sale mechanism where the NFT seller can    *
-     * can select an address to be whitelisted. This address is then    *
-     * allowed to make a bid on the NFT. No other address can bid on    *
-     * the NFT.                                                         *
-     ********************************************************************/
-    // function _setupSale(
-    //     address _nftContractAddress,
-    //     uint256 _tokenId,
-    //     uint256 _auctionId,
-    //     uint256 _amount,
-    //     address _erc20Token,
-    //     uint256 _buyNowPrice,
-    //     address _whitelistedBuyer,
-    //     address[] memory _feeRecipients,
-    //     uint32[] memory _feePercentages
-    // )
-    //     internal
-    //     correctFeeRecipientsAndPercentages(
-    //         _feeRecipients.length,
-    //         _feePercentages.length
-    //     )
-    //     isFeePercentagesLessThanMaximum(_feePercentages)
-    // {
-    //     if (_erc20Token != address(0)) {
-    //         nftContractAuctions[_nftContractAddress][_tokenId][_auctionId]
-    //             .ERC20Token = _erc20Token;
-    //     }
-    //     nftContractAuctions[_nftContractAddress][_tokenId][_auctionId]
-    //         .amount = _amount;
-    //     nftContractAuctions[_nftContractAddress][_tokenId][_auctionId]
-    //         .feePercentages = _feePercentages;
-    //     nftContractAuctions[_nftContractAddress][_tokenId][_auctionId]
-    //         .feeRecipients = _feeRecipients;
-    //     nftContractAuctions[_nftContractAddress][_tokenId][_auctionId]
-    //         .feePercentages = _feePercentages;
-    //     nftContractAuctions[_nftContractAddress][_tokenId][_auctionId]
-    //         .buyNowPrice = _buyNowPrice;
-    //     nftContractAuctions[_nftContractAddress][_tokenId][_auctionId]
-    //         .whitelistedBuyer = _whitelistedBuyer;
-    //     nftContractAuctions[_nftContractAddress][_tokenId][_auctionId]
-    //         .nftSeller = msg.sender;
-    // }
-
-    // function createSale(
-    //     address _nftContractAddress,
-    //     uint256 _tokenId,
-    //     uint256 _amount,
-    //     address _erc20Token,
-    //     uint256 _buyNowPrice,
-    //     address _whitelistedBuyer,
-    //     address[] memory _feeRecipients,
-    //     uint32[] memory _feePercentages
-    // )
-    //     external
-    //     senderIsNotAuctioningThisNFT(_nftContractAddress, _tokenId)
-    //     priceGreaterThanZero(_buyNowPrice)
-    // {
-    //     _ids.increment();
-    //     uint256 id = _ids.current();
-    //     //min price = 0
-    //     _setupSale(
-    //         _nftContractAddress,
-    //         _tokenId,
-    //         id,
-    //         _amount,
-    //         _erc20Token,
-    //         _buyNowPrice,
-    //         _whitelistedBuyer,
-    //         _feeRecipients,
-    //         _feePercentages
-    //     );
-
-    //     emit SaleCreated(
-    //         _nftContractAddress,
-    //         _tokenId,
-    //         id,
-    //         _amount,
-    //         msg.sender,
-    //         _erc20Token,
-    //         _buyNowPrice,
-    //         _whitelistedBuyer,
-    //         _feeRecipients,
-    //         _feePercentages
-    //     );
-    //     //check if buyNowPrice is meet and conclude sale, otherwise reverse the early bid
-    //     if (_isABidMade(_nftContractAddress, _tokenId, id)) {
-    //         if (
-    //             //we only revert the underbid if the seller specifies a different
-    //             //whitelisted buyer to the highest bidder
-    //             _isHighestBidderAllowedToPurchaseNFT(
-    //                 _nftContractAddress,
-    //                 _tokenId,
-    //                 id
-    //             )
-    //         ) {
-    //             if (_isBuyNowPriceMet(_nftContractAddress, _tokenId, id)) {
-    //                 _lockNFT(
-    //                     _nftContractAddress,
-    //                     _tokenId,
-    //                     id
-    //                 );
-    //                 _transferNftAndPaySeller(_nftContractAddress, _tokenId, id);
-    //             }
-    //         } else {
-    //             _reverseAndResetPreviousBid(_nftContractAddress, _tokenId, id);
-    //         }
-    //     }
-    // }
-
-    /**********************************/
-    /*╔══════════════════════════════╗
-      ║             END              ║
-      ║            SALES             ║
-      ╚══════════════════════════════╝*/
-    /**********************************/
-
-    /*╔═════════════════════════════╗
-      ║        BID FUNCTIONS        ║
-      ╚═════════════════════════════╝*/
 
     /********************************************************************
      * Make bids with ERC20 Token specified by the NFT seller.          *
@@ -591,6 +453,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         // update highest bid
         auction.highestBid = _tokenAmount;
         auction.highestBidder = msg.sender;
+
         // @todo update minNextBid
 
         _maybeExtendAuctionEnd(auction);
@@ -624,18 +487,6 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         }
     }
 
-    /**********************************/
-    /*╔══════════════════════════════╗
-      ║             END              ║
-      ║       UPDATE AUCTION         ║
-      ╚══════════════════════════════╝*/
-    /**********************************/
-
-    /**********************************/
-
-    /*╔══════════════════════════════╗
-      ║  TRANSFER NFT & PAY SELLER   ║
-      ╚══════════════════════════════╝*/
     function _transferNftAndPaySeller(
         address _nftContractAddress,
         uint256 _tokenId,
@@ -686,20 +537,11 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         return (_totalBid * (_percentage)) / 10000;
     }
 
-    /**********************************/
-    /*╔══════════════════════════════╗
-      ║             END              ║
-      ║  TRANSFER NFT & PAY SELLER   ║
-      ╚══════════════════════════════╝*/
-    /**********************************/
-
-    /*╔══════════════════════════════╗
-      ║      SETTLE & WITHDRAW       ║
-      ╚══════════════════════════════╝*/
     function settleAuction(address _nftContractAddress, uint256 _tokenId, uint256 _auctionId)
         external
         isAuctionOver(_nftContractAddress, _tokenId, _auctionId)
     {
+        // @todo only auctions with bids above minimum can be settled
         _transferNftAndPaySeller(_nftContractAddress, _tokenId, _auctionId);
         emit AuctionSettled(_nftContractAddress, _tokenId, msg.sender);
     }
@@ -718,7 +560,9 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
     //     emit AuctionWithdrawn(_nftContractAddress, _tokenId, msg.sender);
     // }
 
-    // @todo do i need this?
+    /**
+     * @dev bids lower than minimum price can be withdrawn
+     */
     // function withdrawBid(address _nftContractAddress, uint256 _tokenId, uint256 _auctionId)
     //     external
     //     minimumBidNotMade(_nftContractAddress, _tokenId, _auctionId)
