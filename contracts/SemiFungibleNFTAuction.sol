@@ -2,22 +2,23 @@
 pragma solidity 0.8.4;
 
 import "hardhat/console.sol";
-import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
-import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC1155/IERC1155Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC1155/utils/ERC1155HolderUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/structs/EnumerableSetUpgradeable.sol";
+import "./NFTAuctionPermit.sol";
 
 
 /// @title An Auction Contract for bidding and selling ERC1155 tokens
 // @todo inspired by Avo Lags GmbH
 /// @author onepercent.io
 /// @notice This contract can be used for auctioning any ERC1155 tokens accepting any ERC20 tokens as payment
-contract SemiFungibleNFTAuction is ERC1155Holder {
+contract SemiFungibleNFTAuction is ERC1155HolderUpgradeable, NFTAuctionPermit {
 
-    using Counters for Counters.Counter;
-    using EnumerableSet for EnumerableSet.UintSet;
-    using EnumerableSet for EnumerableSet.Bytes32Set;
+    using CountersUpgradeable for CountersUpgradeable.Counter;
+    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.UintSet;
+    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.Bytes32Set;
 
     /*
      * Default values that are used if not specified by the NFT seller.
@@ -25,18 +26,16 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
     uint32 public constant ONE_HOUR = 3600; //1 hour
     uint32 public constant defaultBidIncreasePercentage = 100;
     uint32 public constant bidPercentageConversionFactor = 10000;
-    uint32 public constant maximumMinPricePercentage = 8000;
-    uint256 public constant defaultTokenAmount = 1;
 
     // @todo make it upgradeable
-    uint32 public defaultBidExtendPeriod = ONE_HOUR;
+    uint32 public defaultBidExtendPeriod;
 
-    Counters.Counter public _ids;
+    CountersUpgradeable.Counter public _ids;
 
     mapping(uint256 => Auction) public auctions;
-    mapping(bytes32 => EnumerableSet.UintSet) private activeAuctionsByToken;
-    mapping(address => EnumerableSet.UintSet) private activeAuctionIdsByHolder;
-    mapping(address => EnumerableSet.Bytes32Set) private activeAuctionHashesByHolder;
+    mapping(bytes32 => EnumerableSetUpgradeable.UintSet) private activeAuctionsByToken;
+    mapping(address => EnumerableSetUpgradeable.UintSet) private activeAuctionIdsByHolder;
+    mapping(address => EnumerableSetUpgradeable.Bytes32Set) private activeAuctionHashesByHolder;
 
     enum AUCTION_STATUS {
         ACTIVE,
@@ -60,19 +59,6 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         address[] feeRecipients;
         uint32[] feePercentages;
         AUCTION_STATUS status;
-    }
-
-    struct NewAuctionRequest {
-        address nftContractAddress;
-        uint256 tokenId;
-        uint256 amount;
-        address erc20Token;
-        uint256 minPrice;
-        uint256 start;
-        uint256 end;
-        uint32 bidIncreasePercentage;
-        address[] feeRecipients;
-        uint32[] feePercentages;
     }
 
     event NftAuctionCreated(Auction auction);
@@ -182,6 +168,15 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         _;
     }
 
+    function initialize()
+        public
+        initializer
+    {
+        __EIP712_init("https://rarum.io", "1");
+
+        defaultBidExtendPeriod = ONE_HOUR;
+    }
+
     /*************************************************
      * PUBLIC WRITE METHODS                          *
      *************************************************/
@@ -189,6 +184,13 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
     function createNewNftAuction(NewAuctionRequest calldata _newAuction)
         external
     {
+        _createAuction(_newAuction, msg.sender);
+    }
+    
+    function _createAuction(
+        NewAuctionRequest calldata _newAuction,
+        address _seller
+    ) internal override {
         _validateNewAuction(_newAuction);
 
         _ids.increment();
@@ -210,7 +212,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
             end: _newAuction.end,
             highestBid: 0,
             highestBidder: address(0),
-            nftSeller: msg.sender,
+            nftSeller: _seller,
             ERC20Token: _newAuction.erc20Token,
             feeRecipients: _newAuction.feeRecipients,
             feePercentages: _newAuction.feePercentages,
@@ -236,9 +238,18 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         auctionOngoing(_auctionId)
         // @todo non-reentrant
     {
+        _bid(_auctionId, _erc20Token, _tokenAmount, msg.sender);
+    }
+
+    function _bid(
+        uint256 _auctionId,
+        address _erc20Token,
+        uint256 _tokenAmount,
+        address _bidder
+    ) internal override {
         Auction storage auction = auctions[_auctionId];
 
-        require(msg.sender != auction.nftSeller, "Owner cannot bid on own NFT");
+        require(_bidder != auction.nftSeller, "Owner cannot bid on own NFT");
         require(block.timestamp <= auction.end, "Auction has ended");
         require(_erc20Token == auction.ERC20Token, "Bid token not accepted");
         require(_tokenAmount >= auction.minNextBid, "Bid amount too low");
@@ -247,12 +258,12 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
 
         if (auction.highestBidder != address(0)) {
             // return tokens to previous bidder if there is one
-            IERC20(auction.ERC20Token).transfer(auction.highestBidder, auction.highestBid);
+            IERC20Upgradeable(auction.ERC20Token).transfer(auction.highestBidder, auction.highestBid);
         }
 
         // update highest bid
         auction.highestBid = _tokenAmount;
-        auction.highestBidder = msg.sender;
+        auction.highestBidder = _bidder;
         auction.minNextBid = _tokenAmount * (bidPercentageConversionFactor + auction.bidIncreasePercentage) / bidPercentageConversionFactor;
 
         _maybeExtendAuctionEnd(_auctionId);
@@ -261,7 +272,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
             auction.nftContractAddress,
             auction.tokenId,
             _auctionId,
-            msg.sender,
+            _bidder,
             _erc20Token,
             _tokenAmount
         );
@@ -320,6 +331,10 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         emit MinimumPriceUpdated(_auctionId, _newMinPrice);
 
         _maybeExtendAuctionEnd(_auctionId);
+    }
+
+    function updateExtendBidPeriod(uint32 _newPeriod) external {
+        defaultBidExtendPeriod = _newPeriod;
     }
 
     /*
@@ -405,7 +420,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
     }
 
     function _lockNFT(Auction memory _auction) internal {
-        IERC1155 nftContract = IERC1155(_auction.nftContractAddress);
+        IERC1155Upgradeable nftContract = IERC1155Upgradeable(_auction.nftContractAddress);
 
         uint256 balanceBeforeTransfer = nftContract.balanceOf(address(this), _auction.tokenId);
 
@@ -423,11 +438,11 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
     }
 
     function _lockERC20Tokens(address _erc20Token, uint256 _tokenAmount) internal {
-        IERC20 erc20Contract = IERC20(_erc20Token);
+        IERC20Upgradeable erc20Contract = IERC20Upgradeable(_erc20Token);
 
         uint256 balanceBeforeTransfer = erc20Contract.balanceOf(address(this));
 
-        IERC20(_erc20Token).transferFrom(
+        IERC20Upgradeable(_erc20Token).transferFrom(
             msg.sender,
             address(this),
             _tokenAmount
@@ -440,7 +455,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
 
      /// @dev transfer back tokens to their original owners
     function _unlockTokens(Auction memory _auction) internal {
-        IERC1155(_auction.nftContractAddress).safeTransferFrom(
+        IERC1155Upgradeable(_auction.nftContractAddress).safeTransferFrom(
             address(this),
             _auction.nftSeller,
             _auction.tokenId,
@@ -449,7 +464,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         );
 
         if (_auction.highestBidder != address(0)) {
-            IERC20(_auction.ERC20Token).transfer(
+            IERC20Upgradeable(_auction.ERC20Token).transfer(
                 _auction.highestBidder,
                 _auction.highestBid
             );
@@ -461,7 +476,7 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
 
         _payFeesAndSeller(auction);
 
-        IERC1155(auction.nftContractAddress).safeTransferFrom(
+        IERC1155Upgradeable(auction.nftContractAddress).safeTransferFrom(
             address(this),
             auction.highestBidder,
             auction.tokenId,
@@ -484,11 +499,11 @@ contract SemiFungibleNFTAuction is ERC1155Holder {
         // pay fees
         for (uint256 i = 0; i < _auction.feeRecipients.length; i++) {
             uint256 fee = _calculateFee(_auction.highestBid, _auction.feePercentages[i]);
-            IERC20(_auction.ERC20Token).transfer(_auction.feeRecipients[i], fee);
+            IERC20Upgradeable(_auction.ERC20Token).transfer(_auction.feeRecipients[i], fee);
             feesPaid += fee;
         }
         // pay seller
-        IERC20(_auction.ERC20Token).transfer(_auction.nftSeller, (_auction.highestBid - feesPaid));
+        IERC20Upgradeable(_auction.ERC20Token).transfer(_auction.nftSeller, (_auction.highestBid - feesPaid));
     }
 
     function _maybeExtendAuctionEnd(uint256 _auctionId) internal {

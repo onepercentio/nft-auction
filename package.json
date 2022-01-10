@@ -20,6 +20,7 @@
   "devDependencies": {
     "@nomiclabs/hardhat-etherscan": "^2.1.4",
     "@openzeppelin/contracts": "^4.4.1",
+    "@openzeppelin/contracts-upgradeable": "^4.4.1",
     "g": "^2.0.1",
     "hardhat": "^2.8.0",
     "hardhat-watcher": "^2.1.1"
